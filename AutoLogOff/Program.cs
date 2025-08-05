@@ -212,11 +212,11 @@ class Program
         {
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
-                Process.Start("shutdown", "/l");
+                //Process.Start("shutdown", "/l");
             }
             else
             {
-                Process.Start("pkill", $"-SIGTERM -u {Environment.UserName}");
+                //Process.Start("pkill", $"-SIGTERM -u {Environment.UserName}");
             }
         }
         catch (Exception ex)
