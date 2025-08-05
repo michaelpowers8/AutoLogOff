@@ -7,6 +7,7 @@ import subprocess
 from time import sleep
 from xml_logging import XML_Logger
 from email.mime.text import MIMEText
+from cryptography.fernet import Fernet
 from datetime import datetime,timedelta
 from email.mime.multipart import MIMEMultipart
 from tkinter import Tk, messagebox, simpledialog
@@ -19,12 +20,18 @@ def get_configuration() -> dict[str,str|bool|int]|None:
     """
     config_path:str = "Config.json"
     try:
-        if(os.path.exists(config_path)):
-            with open(config_path,"r",encoding="utf-8") as file:
-                configuration = json.load(file)
-            return configuration
-        else:
-            return None
+        # Load encryption key
+        with open("secret.key", "rb") as key_file:
+            key = key_file.read()
+
+        fernet = Fernet(key)
+
+        # Decrypt the config file
+        with open("Config.encrypted", "rb") as encrypted_file:
+            decrypted_data:bytes = fernet.decrypt(encrypted_file.read())
+            
+        configuration = json.loads(decrypted_data.decode('utf-8'))
+        return configuration
     except:
         return None
 
