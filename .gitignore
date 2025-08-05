@@ -432,3 +432,5 @@ ModelManifest.xml
 *.zip
 *.key
 *.secure
+Config.json
+config.json
