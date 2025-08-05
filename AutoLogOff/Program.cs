@@ -46,7 +46,7 @@ class Program
 
             RunSleepLoop(endTime, minutes).Wait();
 
-            EmailReceipt(startHour, startMinute, endHour, endMinute, configuration, false).Wait();
+            EmailReceipt(startHour, startMinute, endHour, endMinute, configuration, false).Wait();//
 
             LogoffComputer();
         }
