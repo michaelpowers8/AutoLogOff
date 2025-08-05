@@ -1,5 +1,4 @@
 import os
-import pandas
 import json
 import smtplib
 import platform
