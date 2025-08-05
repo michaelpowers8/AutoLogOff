@@ -182,10 +182,10 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
             subject = f"Computer {platform.node()} Log Off"
             body = f"Computer {platform.node()} successfully logged off."
         message = MIMEMultipart('alternative')
-        rcpt = [configuration["CC_Email"],configuration["CC_Email"]]
+        rcpt = [configuration["To_Email"],configuration["CC_Email"]]
         message['Subject'] = subject
         message['From'] = configuration["Sender_Email"]
-        message['To'] = configuration["CC_Email"]
+        message['To'] = configuration["To_Email"]
         message['Cc'] = configuration["CC_Email"]
         html_part = MIMEText(body)
         message.attach(html_part)
