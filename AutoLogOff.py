@@ -18,7 +18,6 @@ def get_configuration() -> dict[str,str|bool|int]|None:
 
     Returns a configuration made as a dictionary.
     """
-    config_path:str = "Config.json"
     try:
         # Load encryption key
         with open("secret.key", "rb") as key_file:
