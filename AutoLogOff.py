@@ -35,6 +35,8 @@ def get_configuration() -> dict[str,str|bool|int]|None:
         return None
 
 def _verify_configuration(configuration:dict[str,str|bool|int], logger:XML_Logger) -> bool:
+    if configuration is None:
+        return False
     required_keys:dict[str,str] =   {
                                         "Logger_Base_Directory":str,
                                         "Logger_Filename":str,
