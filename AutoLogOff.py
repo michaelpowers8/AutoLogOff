@@ -11,7 +11,7 @@ from datetime import datetime,timedelta
 from email.mime.multipart import MIMEMultipart
 from tkinter import Tk, messagebox, simpledialog
 
-def get_configuration() -> dict[str,str]|None:
+def get_configuration() -> dict[str,str|bool|int]|None:
     config_path:str = "Config.json"
     try:
         if(os.path.exists(config_path)):
@@ -23,7 +23,7 @@ def get_configuration() -> dict[str,str]|None:
     except:
         return None
 
-def _verify_configuration(configuration:dict[str,str], logger:XML_Logger) -> bool:
+def _verify_configuration(configuration:dict[str,str|bool|int], logger:XML_Logger) -> bool:
     required_keys:dict[str,str] =   {
                                         "Logger_Base_Directory":str,
                                         "Logger_Filename":str,
@@ -58,7 +58,7 @@ def _verify_configuration(configuration:dict[str,str], logger:XML_Logger) -> boo
         return False
     return True
 
-def get_logger(configuration:dict[str,str]) -> XML_Logger:
+def get_logger(configuration:dict[str,str|bool|int]) -> XML_Logger:
     logger:XML_Logger = XML_Logger(
                                     log_file=configuration["Logger_Filename"], 
                                     archive_folder=configuration["Logger_Archive_Folder"],
@@ -122,7 +122,7 @@ def get_start_and_end_times(minutes:int) -> str:
         end_minute:str = str(end_minute)
     return end_time,start_hour,start_minute,end_hour,end_minute,f"The login time is {start_hour}:{start_minute} {am_pm_start}\nYou will be logged off at {end_hour}:{end_minute} {am_pm_end}"
 
-def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:int, end_minute:int, configuration:dict[str,str], logging_in:bool) -> None:
+def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:int, end_minute:int, configuration:dict[str,str|bool|int], logging_in:bool) -> None:
     try:
         if(logging_in):
             subject = f"Computer {platform.node()} Logged In"
@@ -145,7 +145,7 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
     except Exception as e:
         logger.log_to_xml(f"Email failed to send. Official error: {traceback.format_exc()}","ERROR",basepath=logger.base_dir)
 
-def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,warning_minutes:int) -> None:
+def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration:dict[str,str|bool|int]) -> None:
     while datetime.now() < end_time:
         minutes_left_float:float = ((end_time-datetime.now()).total_seconds())/60
         if(minutes_left_float < 1):
@@ -154,7 +154,10 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,warning_minut
             sleep(max(60 - (datetime.now().second % 60), 0))  # Align to whole minutes
         minutes_left:int = round(((end_time-datetime.now()).total_seconds())/60)
         logger.log_to_xml(f"{minutes_left:,.0f}/{minutes} minutes remaining","INFO",basepath=logger.base_dir)
-        if(minutes_left == warning_minutes):
+        if(
+            (configuration["Warn_User_Of_Logoff"])and
+            (minutes_left == configuration["Logoff_Warning_Time_Left"])
+          ):
             messagebox.showwarning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
 
 def logoff_computer():
@@ -165,7 +168,7 @@ def logoff_computer():
         subprocess.run(["pkill", "-SIGTERM", "-u", os.getenv("USER")])
 
 def main() -> None:
-    configuration:dict[str,str] = get_configuration()
+    configuration:dict[str,str|bool|int] = get_configuration()
     logger:XML_Logger = get_logger(configuration=configuration)
     if(not(_verify_configuration(configuration=configuration,logger=logger))):
         return
@@ -181,7 +184,7 @@ def main() -> None:
     messagebox.showinfo("LOGOFF TIME",start_end_time_message)
     logger.log_to_xml(start_end_time_message,basepath=logger.base_dir,status="INFO")
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=True, configuration=configuration)
-    run_sleep_loop(logger, end_time, minutes, configuration["Logoff_Warning_Time_Left"])
+    run_sleep_loop(logger, end_time, minutes, configuration, )
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=False, configuration=configuration)
     logoff_computer()
 
