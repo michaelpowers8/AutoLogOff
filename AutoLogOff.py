@@ -34,6 +34,7 @@ def _verify_configuration(configuration:dict[str,str], logger:XML_Logger) -> boo
                                         "Sender_Email_Password":str,
                                         "To_Email":str,
                                         "CC_Email":str,
+                                        "Logoff_Warning_Time_Left":int,
                                         "DEBUG":bool
                                     }
     missing_keys:list[str] = []
@@ -43,6 +44,15 @@ def _verify_configuration(configuration:dict[str,str], logger:XML_Logger) -> boo
             (not(isinstance(configuration[key],item)))or
             (configuration[key] is None) or
             (configuration[key] == "")
+          ):
+            missing_keys.append(key)
+        if(
+            (key in configuration.keys())and
+            (key == "Logoff_Warning_Time_Left")and 
+            (
+                (configuration[key] == 0)or # 0 is invalid because then the user will be warned and it will shut off simultaneously which is counter productive.
+                (configuration[key] < -1) # -1 is valid and just assumed to give no warning to the user
+            )
           ):
             missing_keys.append(key)
     if missing_keys:
@@ -137,16 +147,16 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
     except Exception as e:
         logger.log_to_xml(f"Email failed to send. Official error: {traceback.format_exc()}","ERROR",basepath=logger.base_dir)
 
-def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int) -> None:
+def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,warning_minutes:int) -> None:
     while datetime.now() < end_time:
         minutes_left_float:float = ((end_time-datetime.now()).total_seconds())/60
         if(minutes_left_float < 1):
-            sleep((minutes_left_float*60)+1)  # Sleep for the proper number of seconds in the last minute plus one second.
+            sleep((minutes_left_float*60)+0.01)  # Sleep for the proper number of seconds in the last minute plus one second.
         else:
             sleep(max(60 - (datetime.now().second % 60), 0))  # Align to whole minutes
         minutes_left:int = round(((end_time-datetime.now()).total_seconds())/60)
         logger.log_to_xml(f"{minutes_left:,.0f}/{minutes} minutes remaining","INFO",basepath=logger.base_dir)
-        if(minutes_left in [1,5]):
+        if(minutes_left == warning_minutes):
             messagebox.showwarning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
 
 def logoff_computer():
@@ -173,7 +183,7 @@ def main() -> None:
     messagebox.showinfo("LOGOFF TIME",start_end_time_message)
     logger.log_to_xml(start_end_time_message,basepath=logger.base_dir,status="INFO")
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=True, configuration=configuration)
-    run_sleep_loop(logger, end_time, minutes)
+    run_sleep_loop(logger, end_time, minutes, configuration["Logoff_Warning_Time_Left"])
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=False, configuration=configuration)
     logoff_computer()
 
