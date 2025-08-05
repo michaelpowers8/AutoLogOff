@@ -430,3 +430,5 @@ ModelManifest.xml
 /MediaLibraryFtp/MediaLibraryFtpService/logs/*
 /OCRImagePDF/OCRImagePDF.csproj.user
 *.zip
+*.key
+*.secure
