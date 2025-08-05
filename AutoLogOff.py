@@ -227,7 +227,7 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration
 
 def logoff_computer():
     """
-    Dynamic system to log off the computer whether it is windows or something else.
+    Dynamic system to log off the computer whether it is windows, Linux or Mac.
     """
     return None # Used for testing everything else without logging off and having to wait to log back in
     if platform.system() == "Windows":
