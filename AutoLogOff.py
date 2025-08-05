@@ -225,11 +225,12 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration
           ):
             messagebox.showwarning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
 
-def logoff_computer():
+def logoff_computer(debugging:bool):
     """
     Dynamic system to log off the computer whether it is windows, Linux or Mac.
     """
-    return None # Used for testing everything else without logging off and having to wait to log back in
+    if debugging:
+        return None # Used for testing everything else without logging off and having to wait to log back in
     if platform.system() == "Windows":
         subprocess.run(["shutdown", "-l"], shell=True)
     else:
@@ -254,7 +255,7 @@ def main() -> None:
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=True, configuration=configuration)
     run_sleep_loop(logger, end_time, minutes, configuration, )
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=False, configuration=configuration)
-    logoff_computer()
+    logoff_computer(configuration["DEBUG"])
 
 if __name__ == "__main__":
     main()
