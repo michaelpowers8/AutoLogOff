@@ -34,6 +34,7 @@ def _verify_configuration(configuration:dict[str,str], logger:XML_Logger) -> boo
                                         "Sender_Email_Password":str,
                                         "To_Email":str,
                                         "CC_Email":str,
+                                        "Warn_User_Of_Logoff":bool,
                                         "Logoff_Warning_Time_Left":int,
                                         "DEBUG":bool
                                     }
@@ -49,10 +50,7 @@ def _verify_configuration(configuration:dict[str,str], logger:XML_Logger) -> boo
         if(
             (key in configuration.keys())and
             (key == "Logoff_Warning_Time_Left")and 
-            (
-                (configuration[key] == 0)or # 0 is invalid because then the user will be warned and it will shut off simultaneously which is counter productive.
-                (configuration[key] < -1) # -1 is valid and just assumed to give no warning to the user
-            )
+            (configuration[key] < 1)
           ):
             missing_keys.append(key)
     if missing_keys:
