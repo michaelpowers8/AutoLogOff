@@ -86,7 +86,7 @@ def get_number_of_user_minutes() -> int:
 def get_start_and_end_times(minutes:int) -> str:
     start_time:datetime = datetime.now()
     start_hour:int = start_time.hour
-    am_pm_start = "A.M." if start_hour >= 12 else "P.M."
+    am_pm_start = "A.M." if start_hour < 12 else "P.M."
     if(start_hour>12):
         start_hour -= 12
         start_hour:str = str(start_hour)
@@ -100,8 +100,8 @@ def get_start_and_end_times(minutes:int) -> str:
         start_minute:str = str(start_minute)
         
     end_time = start_time+timedelta(minutes=minutes)
-    am_pm_end = "A.M." if end_hour >= 12 else "P.M."
     end_hour = end_time.hour
+    am_pm_end = "A.M." if end_hour < 12 else "P.M."
     if(end_hour>12):
         end_hour -= 12
         end_hour:str = str(end_hour)
@@ -123,10 +123,10 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
             subject = f"Computer {platform.node()} Log Off"
             body = f"Computer {platform.node()} successfully logged off."
         message = MIMEMultipart('alternative')
-        rcpt = [configuration["CC_Email"],configuration["To_Email"]]
+        rcpt = [configuration["CC_Email"],configuration["CC_Email"]]
         message['Subject'] = subject
         message['From'] = configuration["Sender_Email"]
-        message['To'] = configuration["To_Email"]
+        message['To'] = configuration["CC_Email"]
         message['Cc'] = configuration["CC_Email"]
         html_part = MIMEText(body)
         message.attach(html_part)
@@ -139,17 +139,22 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
 
 def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int) -> None:
     while datetime.now() < end_time:
-        sleep(max(60 - (datetime.now().second % 60), 0))  # Align to whole minutes
-        minutes_left:int = ((end_time-datetime.now()).total_seconds())/60
+        minutes_left_float:float = ((end_time-datetime.now()).total_seconds())/60
+        if(minutes_left_float < 1):
+            sleep((minutes_left_float*60)+1)  # Sleep for the proper number of seconds in the last minute plus one second.
+        else:
+            sleep(max(60 - (datetime.now().second % 60), 0))  # Align to whole minutes
+        minutes_left:int = round(((end_time-datetime.now()).total_seconds())/60)
         logger.log_to_xml(f"{minutes_left:,.0f}/{minutes} minutes remaining","INFO",basepath=logger.base_dir)
         if(minutes_left in [1,5]):
             messagebox.showwarning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
 
 def logoff_computer():
+    return None # Used for testing everything else without logging off and having to wait to log back in
     if platform.system() == "Windows":
         subprocess.run(["shutdown", "-l"], shell=True)
     else:
-        subprocess.run(["pkill", "-SIGTERM", "-u", os.getenv("USER")])  # Graceful termination
+        subprocess.run(["pkill", "-SIGTERM", "-u", os.getenv("USER")])
 
 def main() -> None:
     configuration:dict[str,str] = get_configuration()
@@ -167,9 +172,9 @@ def main() -> None:
     end_time,start_hour,start_minute,end_hour,end_minute,start_end_time_message = get_start_and_end_times(minutes)
     messagebox.showinfo("LOGOFF TIME",start_end_time_message)
     logger.log_to_xml(start_end_time_message,basepath=logger.base_dir,status="INFO")
-    email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=True)
+    email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=True, configuration=configuration)
     run_sleep_loop(logger, end_time, minutes)
-    email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=False)
+    email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=False, configuration=configuration)
     logoff_computer()
 
 if __name__ == "__main__":
