@@ -1,4 +1,5 @@
 import os
+import pandas
 import json
 import smtplib
 import platform
@@ -12,6 +13,11 @@ from email.mime.multipart import MIMEMultipart
 from tkinter import Tk, messagebox, simpledialog
 
 def get_configuration() -> dict[str,str|bool|int]|None:
+    """
+    Get the configuration from corresponding Config.json.
+
+    Returns a configuration made as a dictionary.
+    """
     config_path:str = "Config.json"
     try:
         if(os.path.exists(config_path)):
@@ -59,6 +65,7 @@ def _verify_configuration(configuration:dict[str,str|bool|int], logger:XML_Logge
     return True
 
 def get_logger(configuration:dict[str,str|bool|int]) -> XML_Logger:
+    """Get the logger that will be used to log information and errors to developer for future debugging."""
     logger:XML_Logger = XML_Logger(
                                     log_file=configuration["Logger_Filename"], 
                                     archive_folder=configuration["Logger_Archive_Folder"],
@@ -68,11 +75,23 @@ def get_logger(configuration:dict[str,str|bool|int]) -> XML_Logger:
     return logger
 
 def display_discretion_message() -> None:
+    """
+    Display a warning message to the user that this is an automated program to shut the computer off after a set period of time.
+    Terminating the program early will result in computer privileges revoked.
+    """
     # Display information to the user
     messagebox.showinfo("DISCRETION", """This is the automatic logoff program. It will log the computer off after a pre-designated number of minutes.
 If the program is closed at any point while the computer is logged on, the IT director and the administrator will be notified immediately and you will be asked to leave the computer.""")
 
 def get_number_of_user_minutes() -> int:
+    """
+    Displays a message for management asking how many total minutes the user will be permitted to use the computer.
+    Number of minutes must be an integer between 1-120 inclusive. If bad input is entered, a new window with the 
+    same message will pop up.
+
+    Returns:
+        >>> int representing number of total minutes the user will be permitted to use the computer before it is forcefully logged off.
+    """
     # Get user input
     logoff_minutes:str = simpledialog.askstring("TIME", "How many total minutes will be permitted until the computer is logged off?\nMinimum 1 minute. Maximum 120 minutes. ")
     if(logoff_minutes is None):
@@ -91,7 +110,24 @@ def get_number_of_user_minutes() -> int:
     minutes:int = int(logoff_minutes)
     return minutes
 
-def get_start_and_end_times(minutes:int) -> str:
+def get_start_and_end_times(minutes:int) -> tuple[datetime,int,int,int,int,str]:
+    """
+    Get the exact date and time the user's computer time will start and end down to the microsecond. Will use these times to inform the user of their
+    logoff time, and maintain proper computations and accurate timing.
+
+    Arguments
+    ---------
+        int minutes representing the total number of minutes the user will be allowed to be logged into the computer.
+    
+    Returns:
+    --------
+        datetime end_time for the exact time the logoff process will begin
+        int start_hour for the hour number that will be displayed to the user
+        int start_minute for the minute number that will be displayed to the user
+        int end_hour for the hour number that will be displayed to the user
+        int end_minute for the minute number that will be displayed to the user
+        str representing the full message that the user will see informing them of the exact time their login time is and when their log off time will be
+    """
     start_time:datetime = datetime.now()
     start_hour:int = start_time.hour
     am_pm_start = "A.M." if start_hour < 12 else "P.M."
@@ -123,6 +159,22 @@ def get_start_and_end_times(minutes:int) -> str:
     return end_time,start_hour,start_minute,end_hour,end_minute,f"The login time is {start_hour}:{start_minute} {am_pm_start}\nYou will be logged off at {end_hour}:{end_minute} {am_pm_end}"
 
 def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:int, end_minute:int, configuration:dict[str,str|bool|int], logging_in:bool) -> None:
+    """
+    Email To and CC any management or developers about when a user logs on or off the computer. This is meant as an external record in case the logs on the 
+    computer are corrupted in any way. 
+
+    Arguments
+    --------
+        logger : XML_Logger to log any error that occurs while trying to send the email out, or log when an email is successfully sent
+        start_hour : int to inform the hour the computer was logged in
+        start_minute : int to inform the minute the computer was logged in
+        end_hour : int to inform the hour the computer was logged off
+        end_minute : int to inform the minute the computer was logged off
+
+    Returns:
+    --------
+        None
+    """
     try:
         if(logging_in):
             subject = f"Computer {platform.node()} Logged In"
@@ -146,6 +198,19 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
         logger.log_to_xml(f"Email failed to send. Official error: {traceback.format_exc()}","ERROR",basepath=logger.base_dir)
 
 def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration:dict[str,str|bool|int]) -> None:
+    """
+    Silently keep the program running in the background checking every 60 seconds how many minutes are left and logging the information. 
+    Logging every minute helps us keep track if a user willingly logs off early, the program will terminate, but the logs will inform
+    management that no rules were violated since the logs will inform of the early log off. Also, inform the user when their time is almost
+    out.
+
+    Arguments
+    ---------
+        logger : XML_Logger to log every minute that passes to keep tabs in case user logs off early
+        end_time : datetime to terminate the loop when the current date surpasses the end time
+        minutes : int representing the total number of minutes the user has access to the computer
+        configuration : dictionary of how the program is meant to run. Configurations used in this are to decide if the user is warned about low time, and how many minutes the user has left before being logged off
+    """
     while datetime.now() < end_time:
         minutes_left_float:float = ((end_time-datetime.now()).total_seconds())/60
         if(minutes_left_float < 1):
@@ -161,6 +226,9 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration
             messagebox.showwarning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
 
 def logoff_computer():
+    """
+    Dynamic system to log off the computer whether it is windows or something else.
+    """
     return None # Used for testing everything else without logging off and having to wait to log back in
     if platform.system() == "Windows":
         subprocess.run(["shutdown", "-l"], shell=True)
