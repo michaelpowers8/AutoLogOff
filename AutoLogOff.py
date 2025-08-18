@@ -28,10 +28,11 @@ def get_configuration() -> dict[str,str|bool|int]|None:
         # Decrypt the config file
         with open("Config.encrypted", "rb") as encrypted_file:
             decrypted_data:bytes = fernet.decrypt(encrypted_file.read())
-            
-        configuration = json.loads(decrypted_data.decode('utf-8'))
+        
+        configuration = json.loads(decrypted_data.decode(errors="ignore"))
         return configuration
-    except:
+    except Exception as e:
+        traceback.print_exc()
         return None
 
 def _verify_configuration(configuration:dict[str,str|bool|int], logger:XML_Logger) -> bool:
