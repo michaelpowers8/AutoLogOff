@@ -12,6 +12,9 @@ from datetime import datetime,timedelta
 from email.mime.multipart import MIMEMultipart
 from tkinter import Tk, messagebox, simpledialog
 
+def block_alt_f4(event):
+    return 'break'
+
 def get_configuration() -> dict[str,str|bool|int]|None:
     """
     Get the configuration from corresponding Config.json.
@@ -201,9 +204,9 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
         with smtplib.SMTP_SSL(configuration["SMTP_SSL_Host"], configuration["SMTP_SSL_Port"]) as server:
             server.login(configuration["Sender_Email"], configuration["Sender_Email_Password"])
             server.sendmail(configuration["Sender_Email"], rcpt, message.as_string())
-        logger.log_to_xml(f"Login email successfully sent to {rcpt}.","SUCCESS",basepath=logger.base_dir)
+        logger.log_to_xml(message=f"Login email successfully sent to {rcpt}.",status="SUCCESS",basepath=logger.base_dir)
     except Exception as e:
-        logger.log_to_xml(f"Email failed to send. Official error: {traceback.format_exc()}","ERROR",basepath=logger.base_dir)
+        logger.log_to_xml(message=f"Email failed to send. Official error: {traceback.format_exc()}",status="ERROR",basepath=logger.base_dir)
 
 def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration:dict[str,str|bool|int]) -> None:
     """
@@ -226,7 +229,7 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration
         else:
             sleep(max(60 - (datetime.now().second % 60), 0))  # Align to whole minutes
         minutes_left:int = round(((end_time-datetime.now()).total_seconds())/60)
-        logger.log_to_xml(f"{minutes_left:,.0f}/{minutes} minutes remaining","INFO",basepath=logger.base_dir)
+        logger.log_to_xml(message=f"{minutes_left:,.0f}/{minutes} minutes remaining",status="INFO",basepath=logger.base_dir)
         if(
             (configuration["Warn_User_Of_Logoff"])and
             (minutes_left == configuration["Logoff_Warning_Time_Left"])
@@ -251,6 +254,8 @@ def main() -> None:
         return
     root:Tk = Tk()
     root.withdraw() # Hide the main window
+    root.bind('<Alt-F4>', block_alt_f4)
+    root.protocol("WM_DELETE_WINDOW", lambda: None)  # Disable the close button
     if configuration.get("DEBUG", True):
         messagebox.showinfo("DEBUG", f"Logger: {logger}")
     display_discretion_message()
