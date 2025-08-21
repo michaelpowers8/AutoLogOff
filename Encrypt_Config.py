@@ -12,7 +12,7 @@ def get_key() -> bytes:
             file.write(key)
             return key
 
-def main():
+def encrypt_configuration():
     key:bytes = get_key()
     fernet:Fernet = Fernet(key)
     with open("Config.encrypted","wb") as encrypted_file:
@@ -22,6 +22,9 @@ def main():
             configuration_bytes:bytes = configuration_str.encode("utf-8")
             configuration_encrypted:bytes = fernet.encrypt(configuration_bytes)
             encrypted_file.write(configuration_encrypted)
+
+def main():
+    encrypt_configuration()
 
 if __name__ == "__main__":
     main()
