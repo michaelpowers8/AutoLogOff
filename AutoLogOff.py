@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from cryptography.fernet import Fernet
 from datetime import datetime,timedelta
 from email.mime.multipart import MIMEMultipart
-from tkinter import Tk, messagebox, simpledialog
+from tkinter import Tk, messagebox, simpledialog, Toplevel, Label 
 
 def block_alt_f4(event):
     return 'break'
@@ -34,6 +34,20 @@ def get_configuration() -> dict[str,str|bool|int]|None:
         
         configuration = json.loads(decrypted_data.decode(errors="ignore"))
         return configuration
+    except Exception as e:
+        traceback.print_exc()
+        return None
+    
+def get_configuration_without_encryption() -> dict[str,str|bool|int]|None:
+    """
+    Get the configuration from corresponding Config.json.
+
+    Returns a configuration made as a dictionary.
+    """
+    try:
+        # Load encryption key
+        with open("Config.json", "rb") as key_file:
+            return json.loads(key_file.read())
     except Exception as e:
         traceback.print_exc()
         return None
@@ -208,12 +222,39 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
     except Exception as e:
         logger.log_to_xml(message=f"Email failed to send. Official error: {traceback.format_exc()}",status="ERROR",basepath=logger.base_dir)
 
-def non_blocking_warning(title, message):
-    warning_thread = threading.Thread(target=lambda: messagebox.showwarning(title, message))
-    warning_thread.daemon = True  # Ensures the thread exits if the main program exits
-    warning_thread.start()
+def non_blocking_warning(root: Tk, title: str, message: str, duration_ms: int = 10000) -> None:
+    """
+    Show a non-modal, top-most notification window that auto-destroys after `duration_ms`.
+    This does not block the main thread (provided run_sleep_loop calls root.update()
+    periodically so Tk event callbacks run).
+    """
+    try:
+        popup = Toplevel(root)
+        popup.title(title)
+        popup.overrideredirect(True)            # remove window decorations (no close button)
+        popup.attributes("-topmost", True)      # stay on top
+        popup.resizable(False, False)
 
-def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration:dict[str,str|bool|int]) -> None:
+        # fixed size + position bottom-right-ish
+        width, height = 340, 90
+        screen_w = root.winfo_screenwidth()
+        screen_h = root.winfo_screenheight()
+        x = screen_w - width - 12
+        y = screen_h - height - 80
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+
+        lbl = Label(popup, text=message, justify="left", anchor="w",
+                    padx=10, pady=10, wraplength=width-20)
+        lbl.pack(expand=True, fill="both")
+
+        # schedule auto-destroy
+        popup.after(duration_ms, popup.destroy)
+    except Exception:
+        # swallow UI errors but log them if logger is available
+        # (don't raise — notifications are best-effort)
+        pass
+
+def run_sleep_loop(logger: XML_Logger, end_time: datetime, minutes: int, configuration: dict[str, str | bool | int], root: Tk) -> None:
     """
     Silently keep the program running in the background checking every 60 seconds how many minutes are left and logging the information. 
     Logging every minute helps us keep track if a user willingly logs off early, the program will terminate, but the logs will inform
@@ -228,18 +269,30 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration
         configuration : dictionary of how the program is meant to run. Configurations used in this are to decide if the user is warned about low time, and how many minutes the user has left before being logged off
     """
     while datetime.now() < end_time:
-        minutes_left_float:float = ((end_time-datetime.now()).total_seconds())/60
-        if(minutes_left_float < 1):
-            sleep((minutes_left_float*60)+0.01)  # Sleep for the proper number of seconds in the last minute plus one second.
-        else:
-            sleep(max(60 - (datetime.now().second % 60), 0))  # Align to whole minutes
-        minutes_left:int = round(((end_time-datetime.now()).total_seconds())/60)
-        logger.log_to_xml(message=f"{minutes_left:,.0f}/{minutes} minutes remaining",status="INFO",basepath=logger.base_dir)
-        if(
-            (configuration["Warn_User_Of_Logoff"])and
-            (minutes_left == configuration["Logoff_Warning_Time_Left"])
-          ):
-            non_blocking_warning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
+        seconds_left = int((end_time - datetime.now()).total_seconds())
+        minutes_left = round(seconds_left / 60)
+
+        logger.log_to_xml(message=f"{minutes_left:,.0f}/{minutes} minutes remaining",
+                          status="INFO", basepath=logger.base_dir)
+
+        # conditional extra warning when configured
+        if (configuration.get("Warn_User_Of_Logoff") and
+                (minutes_left == configuration.get("Logoff_Warning_Time_Left"))):
+            non_blocking_warning(root, "LOGOFF WARNING",
+                                 f"Logging off in {minutes_left} minute(s). Save your progress!",
+                                 duration_ms=10000)
+
+        # Wait up to the next minute but keep Tk events flowing.
+        # Sleep in 1-second increments and call root.update() so that popup.after works.
+        # If there's less than 60 seconds left, loop only for that many seconds.
+        wait_seconds = min(60, max(1, seconds_left))
+        for _ in range(wait_seconds):
+            sleep(1)
+            try:
+                root.update()
+            except Exception:
+                # If root has been destroyed, just continue; we still need to reach end_time.
+                pass
 
 def logoff_computer(debugging:bool):
     """
@@ -253,7 +306,7 @@ def logoff_computer(debugging:bool):
         subprocess.run(["pkill", "-SIGTERM", "-u", os.getenv("USER")])
 
 def main() -> None:
-    configuration:dict[str,str|bool|int] = get_configuration()
+    configuration:dict[str,str|bool|int] = get_configuration_without_encryption()
     logger:XML_Logger = get_logger(configuration=configuration)
     if(not(_verify_configuration(configuration=configuration,logger=logger))):
         return
@@ -268,10 +321,10 @@ def main() -> None:
     if(minutes == -1):
         return
     end_time,start_hour,start_minute,end_hour,end_minute,start_end_time_message = get_start_and_end_times(minutes)
-    messagebox.showinfo("LOGOFF TIME",start_end_time_message)
+    non_blocking_warning(root, "LOGOFF TIME", start_end_time_message, duration_ms=10000)
     logger.log_to_xml(start_end_time_message,basepath=logger.base_dir,status="INFO")
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=True, configuration=configuration)
-    run_sleep_loop(logger, end_time, minutes, configuration, )
+    run_sleep_loop(logger, end_time, minutes, configuration, root)
     email_receipt(logger=logger, start_hour=start_hour, start_minute=start_minute, end_hour=end_hour, end_minute=end_minute, logging_in=False, configuration=configuration)
     logoff_computer(configuration["DEBUG"])
 
