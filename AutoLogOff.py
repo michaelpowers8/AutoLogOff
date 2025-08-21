@@ -208,6 +208,11 @@ def email_receipt(logger:XML_Logger, start_hour:int, start_minute:int, end_hour:
     except Exception as e:
         logger.log_to_xml(message=f"Email failed to send. Official error: {traceback.format_exc()}",status="ERROR",basepath=logger.base_dir)
 
+def non_blocking_warning(title, message):
+    warning_thread = threading.Thread(target=lambda: messagebox.showwarning(title, message))
+    warning_thread.daemon = True  # Ensures the thread exits if the main program exits
+    warning_thread.start()
+
 def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration:dict[str,str|bool|int]) -> None:
     """
     Silently keep the program running in the background checking every 60 seconds how many minutes are left and logging the information. 
@@ -234,7 +239,7 @@ def run_sleep_loop(logger:XML_Logger,end_time:datetime,minutes:int,configuration
             (configuration["Warn_User_Of_Logoff"])and
             (minutes_left == configuration["Logoff_Warning_Time_Left"])
           ):
-            messagebox.showwarning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
+            non_blocking_warning("LOGOFF WARNING",f"Logging off in {minutes_left} minutes. Save your progress!")
 
 def logoff_computer(debugging:bool):
     """
